@@ -119,10 +119,12 @@ function chooseRandom() {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arose', [0,0,0,0,0]);
-guesser.handleResult('unlit', [1,0,0,0,0]);
-guesser.handleResult('dumpy', [0,2,0,0,2]);
-guesser.handleResult('befog', [0,0,1,0,0]);
+guesser.handleResult('arise', [0,0,0,0,1]);
+guesser.handleResult('olden', [0,0,1,1,0]);
+guesser.handleResult('debug', [2,2,0,0,0]);
+// guesser.handleResult('spiky', [2,0,2,1,0]);
+// guesser.handleResult('skill', [2,2,2,0,0]);
+
 
 const letters = new Map();
 Array.from(guesser.possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
