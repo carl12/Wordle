@@ -103,7 +103,7 @@ class WordleGuesser {
       return true;
     });
     this.possible = new Set(posArr);
-    console.log(`Possible after ${guess} is [${posArr.slice(0, 10)}] with length ${posArr.length}`);
+    console.log(`Possible after ${guess} is [${posArr.slice(0, 10)}${posArr.length > 10 ? ',...' : '' }] with length ${posArr.length}`);
     this.gueses.push([guess, result]);
     this.hasWon = result.every(a => a === 2);
   }
@@ -117,48 +117,80 @@ function chooseRandom() {
   return words[Math.floor(Math.random() * words.length)];
 }
 
+function getLetterCounts(possible) {
+  const letters = new Map();
+  Array.from(possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
+  return letters;
+}
+
+function getGuessFreqScores(words, letters, numPossible) {
+  let scores = words.map(word =>{
+    const used = new Set();
+    const myScore = Array.from(word).reduce((sum, c) => {
+      if (used.has(c)) {
+        return sum;
+      } else {
+        used.add(c);
+        return convertCountToScore(letters.get(c), numPossible) + sum;
+      }
+    }, 0);
+    return  [word, myScore];
+  }).sort((a,b) => b[1] - a[1]);
+  scores = scores.map(val => [val[0], val[1]])
+  return scores;
+}
+
+function convertCountToScore(val, max) {
+  if (val == null) {
+    return 0;
+  }
+  if (val < max / 2) {
+    return val;
+  } else if (val < max) {
+    // console.log(max, val, 'asdfasdfasdf');
+    return max - val;
+  } else {
+    // console.log('weird', val, max);
+    return 0;
+  }
+}
+
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arise', [0,0,0,0,1]);
-guesser.handleResult('olden', [0,0,1,1,0]);
-guesser.handleResult('debug', [2,2,0,0,0]);
+guesser.handleResult('arose', [0,0,1,1,0]);
+guesser.handleResult('blunt', [0,1,0,0,0]);
+// guesser.handleResult('chide', [0,0,1,1,0]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
-
-const letters = new Map();
-Array.from(guesser.possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
+const letters = getLetterCounts(guesser.possible);
+const scores = getGuessFreqScores(words, letters, guesser.possible.size);
 console.log();
-console.log('Unfiltered letter counts: ')
+console.log(`Unfiltered letter counts out of total ${guesser.possible.size} possible words: `)
 console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
-letters.set('y', 0);
-letters.set('u', 0);
-// letters.set('n', 0);
-// letters.set('t', 0);
-// letters.set('t', 0);
-const scores = words.map(word =>{
-  const used = new Set();
-  const myScore = Array.from(word).reduce((sum, c) => {
-    if (used.has(c)) {
-      return sum;
-    } else {
-      used.add(c);
-      return (letters.get(c) || 0) + sum;
-    }
-  }, 0);
-  return  [word, myScore];
-}).sort((a,b) => b[1] - a[1]);
-console.log();
-console.log('High scoring words for remaining letters are: ')
-console.log(scores.slice(0,10));
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
-console.log(guesser.getRandomGuess());
+// letters.set('y', 0);
+// letters.set('u', 0);
 
-
-
-console.log(guesser.gueses);
+if (guesser.possible.size > 3) {
+  console.log();
+  console.log('High scoring words for remaining letters are: ')
+  console.log(scores.slice(0,10));
+  console.log();
+  console.log('Potential valid guesses');
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  console.log(guesser.getRandomGuess());
+  
+  console.log(guesser.gueses);
+} else {
+  console.log();
+  if (guesser.possible.size == 1) {
+    console.log('We found it!');
+  }
+  console.log('Possible words:');
+  console.log(Array.from(guesser.possible));
+}
