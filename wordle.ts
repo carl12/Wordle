@@ -37,7 +37,7 @@ class WordleGuesser {
     this.game = game;
   }
 
-  makeGuess(word = null) {
+  makeGuess(word: string | null = null) {
     if (this.hasWon) {
       return;
     }
@@ -59,8 +59,12 @@ class WordleGuesser {
       return this.getValidGuess();
     } else if (this.strat === 1) {
       return this.getRandomGuess();
+    } else if (this.strat === 2) {
+      return this.getValidFreqGuess();
+    } else if (this.strat === 2) {
+      return this.getAnyFreqGuess();
     } else {
-      return this.getCommonLetterGuess();
+      return this.getValidGuess();
     }
   }
 
@@ -74,17 +78,23 @@ class WordleGuesser {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  getCommonLetterGuess() {
+  getValidFreqGuess(): string {
     const arr = Array.from(this.possible);
-    const charCounts = new Map();
-    for (let word of arr) {
-      for (let char of word) {
-        charCounts.set(char, (charCounts.get(char) || 0) + 1);
-      }
+    const charCounts = getLetterCounts(this.possible);
+    // restrict options to possible words
+    const scores = getGuessFreqScores(arr, letters, guesser.possible.size);
+    return scores[0][0];
+  }
+
+  getAnyFreqGuess(): string {
+    if (this.possible.size < 3) {
+      return Array.from(this.possible)[0];
     }
-    const counts = Array.from(charCounts).sort((a, b) => b[1] - a[1]);
-    // console.log(counts);
-    return this.getRandomGuess();
+    const charCounts = getLetterCounts(this.possible);
+    // Allow guess of any word
+    const scores = getGuessFreqScores(words, letters, guesser.possible.size);
+    return scores[0][0];
+
   }
 
   handleResult(guess: string, guessCharMatch: number[], debug = false) {
@@ -143,7 +153,7 @@ function chooseRandom() {
   return words[Math.floor(Math.random() * words.length)];
 }
 
-function getLetterCounts(possible: Set<string>) {
+function getLetterCounts(possible: Set<string>): Map<string, number> {
   const letters = new Map();
   Array.from(possible)
     .forEach(word => Array.from(word)
@@ -163,8 +173,9 @@ function getGuessFreqScores(words: string[], letters: Map<string, number>, numPo
       }
     }, 0);
     return [word, myScore] as [string, number];
-  }).sort((a, b) => b[1] - a[1]);
-  scores = scores.map(val => [val[0], val[1]])
+  })
+  scores.sort((a, b) => b[1] - a[1]);
+  scores = scores.map(val => [val[0], val[1]]);
   return scores;
 }
 
@@ -185,8 +196,8 @@ function convertCountToScore(val: number | undefined, max: number) {
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
 guesser.handleResult('orate', [0, 0, 1, 1, 0]);
-guesser.handleResult('finch', [0, 0, 1, 0, 0]);
-guesser.handleResult('gutsy', [0, 0, 1, 0, 2]);
+guesser.handleResult('antic', [1, 1, 1, 0, 0]);
+// guesser.handleResult('haunt', [0,2,0,2,1]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
@@ -203,14 +214,8 @@ if (guesser.possible.size > 3) {
   console.log('High scoring words for remaining letters are: ')
   console.log(scores.slice(0, 10));
   console.log();
-  console.log('Potential valid guesses');
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
-  console.log(guesser.getRandomGuess());
+  console.log(`Potential frequency guess ${guesser.getAnyFreqGuess()}`);
+  console.log(`Potential valid guess ${guesser.getValidFreqGuess()}`);
 
   console.log(guesser.gueses);
 } else {
