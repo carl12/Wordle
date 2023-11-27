@@ -1,12 +1,11 @@
-import { stringify } from "querystring";
-
 const fs = require('fs');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
-const words = fs.readFileSync('./wordle/5words.txt')
+const words: string[] = fs.readFileSync('./wordle/5words.txt')
   .toString().split(',')
-  .filter(word => !word.endsWith('s'));const wordsSet = new Set(words);
+  .filter((word: string) => !word.endsWith('s'));
+const wordsSet = new Set(words);
 class WordleGame {
-    myWord: string;
+  myWord: string;
   constructor() {
     this.myWord = 'kinky'; // chooseRandom();
     // console.log(this.myWord);
@@ -27,12 +26,12 @@ class WordleGame {
 }
 
 class WordleGuesser {
-    strat: number;
-    possible: Set<string>;
-    gueses: [string, number[]][] = [];
-    game: WordleGame;
-    hasWon = false;
-  constructor(game, strat = 0) {
+  strat: number;
+  possible: Set<string>;
+  gueses: [string, number[]][] = [];
+  game: WordleGame;
+  hasWon = false;
+  constructor(game: WordleGame, strat = 0) {
     this.strat = strat;
     this.possible = new Set(words);
     this.game = game;
@@ -47,10 +46,10 @@ class WordleGuesser {
     console.log(guess);
     const res = this.game.checkAnswer(guess);
     if (res == null) {
-        console.log(`Guess ${guess} is not in the word dictionary. Ignoring`);
+      console.log(`Guess ${guess} is not in the word dictionary. Ignoring`);
     } else {
-        this.handleResult(guess, res);
-        console.log(`Guessed ${guess} and result was ${res}`);
+      this.handleResult(guess, res);
+      console.log(`Guessed ${guess} and result was ${res}`);
     }
 
   }
@@ -79,7 +78,7 @@ class WordleGuesser {
     const arr = Array.from(this.possible);
     const charCounts = new Map();
     for (let word of arr) {
-      for(let char of word) {
+      for (let char of word) {
         charCounts.set(char, (charCounts.get(char) || 0) + 1);
       }
     }
@@ -88,42 +87,54 @@ class WordleGuesser {
     return this.getRandomGuess();
   }
 
-  handleResult(guess: string, result: number[], debug = false) {
-    const invalidChars = guess.split('').filter((_, i) => result[i] === 0).filter(c => !findAll(guess, c).some(i => result[i] === 2));
-    const presentChars = guess.split('').filter((_, i) => result[i] === 1 || result[i] == 2);
+  handleResult(guess: string, guessCharMatch: number[], debug = false) {
+    const invalidChars = guess.split('')
+      .filter((_, i) => guessCharMatch[i] === 0)
+      .filter(c => !findAll(guess, c).some(i => guessCharMatch[i] === 2));
+    const presentChars = guess.split('').filter((_, i) => guessCharMatch[i] === 1 || guessCharMatch[i] == 2);
+    const misplacedChars = guessCharMatch
+      .map((val, i) => (val === 1 ? [guess[i], i] : [guess[i], -1]))
+      .filter(entry => entry[1] !== -1) as [string, number][];
     const correctChars = guess.split('')
-        .map((c, i) => result[i] === 2 ? [c, i] : [c, -1])
-        .filter(([c, i]) => i !== -1) as [string, number][];
-    
+      .map((c, i) => guessCharMatch[i] === 2 ? [c, i] : [c, -1])
+      .filter(([_, i]) => i !== -1) as [string, number][];
+
     const posArr = Array.from(this.possible).filter(word => {
-      if (result.map((val, i) => [guess[i], val, i]).filter(entry => entry[1] === 1).some(([c, val, loc]) => word[loc] === c)) {
-        if (debug) { console.log('asdf'); }
-        return false;
-      } else if (invalidChars.some(c => word.includes(c))) {
-        if (debug) { console.log('asdf1'); console.log('invalid chars are ', invalidChars); console.log(result);
-        console.log(guess.split(''));
-        console.log(guess.split('').filter((_, i) => result[i] === 0));
-      }
-        return false;
-      } else if (!presentChars.every(c => word.includes(c))) {
-        if (debug) { console.log('asdf2'); }
-        return false;
-      } else if (!correctChars.every(([c1, loc]) => Array.from(word).map((c2, i) => c2 === c1 ? i : -1).includes(loc))) {
-        if (debug) { console.log('asdf3'); }
-        return false;
-      }
-      return true;
+      return wordIsPossible(word, guess, guessCharMatch, invalidChars, presentChars, misplacedChars, correctChars, debug);
     });
     this.possible = new Set(posArr);
-    console.log(`Possible after ${guess} is [${posArr.slice(0, 10)}${posArr.length > 10 ? ',...' : '' }] with length ${posArr.length}`);
-    this.gueses.push([guess, result]);
-    this.hasWon = result.every(a => a === 2);
+    console.log(`Possible after ${guess} is [${posArr.slice(0, 10)}${posArr.length > 10 ? ',...' : ''}] with length ${posArr.length}`);
+    this.gueses.push([guess, guessCharMatch]);
+    this.hasWon = guessCharMatch.every(a => a === 2);
   }
+}
+
+function wordIsPossible(word: string, guess: string, guessCharMatch: number[], invalidChars: string[], presentChars: string[], misplacedChars: [string, number][], correctChars: [string, number][], debug = false): boolean {
+  if (misplacedChars.some(([c, loc]) => word[loc] === c)) {
+    if (debug) { console.log('asdf'); }
+    // If word has a character which was marked as not in the right place, it cannot be the word
+    return false;
+  } else if (invalidChars.some(c => word.includes(c))) {
+    if (debug) {
+      console.log('asdf1'); console.log('invalid chars are ', invalidChars); console.log(guessCharMatch);
+      console.log(guess.split(''));
+      console.log(guess.split('').filter((_, i) => guessCharMatch[i] === 0));
+    }
+    // If word has invalid character
+    return false;
+  } else if (!presentChars.every(c => word.includes(c))) {
+    if (debug) { console.log('asdf2'); }
+    return false;
+  } else if (!correctChars.every(([c1, loc]) => Array.from(word).map((c2, i) => c2 === c1 ? i : -1).includes(loc))) {
+    if (debug) { console.log('asdf3'); }
+    return false;
+  }
+  return true;
 }
 
 function findAll(str: string, val: string): number[] {
   return Array.from(str)
-    .map((c, i) => [c,i] as [string, number])
+    .map((c, i) => [c, i] as [string, number])
     .filter(([el, _]) => el === val)
     .map(([_, i]) => i);
 }
@@ -140,8 +151,8 @@ function getLetterCounts(possible: Set<string>) {
   return letters;
 }
 
-function getGuessFreqScores(words, letters, numPossible) {
-  let scores = words.map(word =>{
+function getGuessFreqScores(words: string[], letters: Map<string, number>, numPossible: number) {
+  let scores = words.map(word => {
     const used = new Set();
     const myScore = Array.from(word).reduce((sum, c) => {
       if (used.has(c)) {
@@ -151,13 +162,13 @@ function getGuessFreqScores(words, letters, numPossible) {
         return convertCountToScore(letters.get(c), numPossible) + sum;
       }
     }, 0);
-    return  [word, myScore];
-  }).sort((a,b) => b[1] - a[1]);
+    return [word, myScore] as [string, number];
+  }).sort((a, b) => b[1] - a[1]);
   scores = scores.map(val => [val[0], val[1]])
   return scores;
 }
 
-function convertCountToScore(val, max) {
+function convertCountToScore(val: number | undefined, max: number) {
   if (val == null) {
     return 0;
   }
@@ -173,9 +184,9 @@ function convertCountToScore(val, max) {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('orate', [0,0,1,1,0]);
-guesser.handleResult('finch', [0,0,1,0,0]);
-guesser.handleResult('gutsy', [0,0,1,0,2]);
+guesser.handleResult('orate', [0, 0, 1, 1, 0]);
+guesser.handleResult('finch', [0, 0, 1, 0, 0]);
+guesser.handleResult('gutsy', [0, 0, 1, 0, 2]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
@@ -183,14 +194,14 @@ const letters = getLetterCounts(guesser.possible);
 const scores = getGuessFreqScores(words, letters, guesser.possible.size);
 console.log();
 console.log(`Unfiltered letter counts out of total ${guesser.possible.size} possible words: `)
-console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
+console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
 // letters.set('y', 0);
 // letters.set('u', 0);
 
 if (guesser.possible.size > 3) {
   console.log();
   console.log('High scoring words for remaining letters are: ')
-  console.log(scores.slice(0,10));
+  console.log(scores.slice(0, 10));
   console.log();
   console.log('Potential valid guesses');
   console.log(guesser.getRandomGuess());
@@ -200,7 +211,7 @@ if (guesser.possible.size > 3) {
   console.log(guesser.getRandomGuess());
   console.log(guesser.getRandomGuess());
   console.log(guesser.getRandomGuess());
-  
+
   console.log(guesser.gueses);
 } else {
   console.log();
