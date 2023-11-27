@@ -1,6 +1,8 @@
 const fs = require('fs');
-function wordle(){}
-const words =  fs.readFileSync('./wordle/5words.txt').toString().split(',');
+// Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
+const words = fs.readFileSync('./wordle/5words.txt')
+  .toString().split(',')
+  .filter(word => !word.endsWith('s'));
 const wordsSet = new Set(words);
 class WordleGame {
   constructor() {
@@ -119,7 +121,9 @@ function chooseRandom() {
 
 function getLetterCounts(possible) {
   const letters = new Map();
-  Array.from(possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
+  Array.from(possible)
+    .forEach(word => Array.from(word)
+      .forEach((c, i) => letters.set(c, (letters.get(c) || 0) + 1)));
   return letters;
 }
 
@@ -147,7 +151,6 @@ function convertCountToScore(val, max) {
   if (val < max / 2) {
     return val;
   } else if (val < max) {
-    // console.log(max, val, 'asdfasdfasdf');
     return max - val;
   } else {
     // console.log('weird', val, max);
@@ -157,9 +160,9 @@ function convertCountToScore(val, max) {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arose', [0,0,1,1,0]);
-guesser.handleResult('blunt', [0,1,0,0,0]);
-// guesser.handleResult('chide', [0,0,1,1,0]);
+guesser.handleResult('orate', [0,0,1,1,0]);
+guesser.handleResult('finch', [0,0,1,0,0]);
+guesser.handleResult('gutsy', [0,0,1,0,2]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
