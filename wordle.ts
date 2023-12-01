@@ -28,6 +28,10 @@ class WordleGame {
 class WordleGuesser {
     strat: number;
     possible: Set<string>;
+    invalidChars: Set<string> = new Set();
+    misplacedChars: Set<string> = new Set();
+    correctChars: [string, string, string, string, string] = ['', '', '', '', ''];
+
     gueses: [string, number[]][] = [];
     game: WordleGame;
     hasWon = false;
@@ -112,7 +116,14 @@ class WordleGuesser {
             return wordIsPossible(word, guess, guessCharMatch, invalidChars, presentChars, misplacedChars, correctChars, debug);
         });
         this.possible = new Set(posArr);
+        invalidChars.forEach(c => this.invalidChars.add(c));
+        misplacedChars.filter(([c, _]) => !this.correctChars.includes(c)).forEach(([c, _]) => this.misplacedChars.add(c));
+        correctChars.forEach(([c, i]) => {
+            this.misplacedChars.delete(c);
+            this.correctChars[i] = c;
+        });
         console.log(`Possible after ${guess} is [${posArr.slice(0, 10)}${posArr.length > 10 ? ',...' : ''}] with length ${posArr.length}`);
+        console.log(`Correct letters [${Array.from(this.correctChars)}]. Misplaced letters [${Array.from(this.misplacedChars)}]. Invalid chars [${Array.from(this.invalidChars)}]`)
         this.gueses.push([guess, guessCharMatch]);
         this.hasWon = guessCharMatch.every(a => a === 2);
     }
@@ -157,7 +168,7 @@ function hasInvalidChar(word: string, invalidChars: string[], correctChars: [str
             if (!correctChars.some(([validChar, validCharLoc]) => validChar === invalid && validCharLoc === index)) {
                 // Word has a character marked as invalid which is also marked as valid, but not in same space
                 return true;
-            } 
+            }
         }
     }
     return false;
@@ -217,13 +228,45 @@ function convertCountToScore(val: number | undefined, max: number) {
     }
 }
 
+// function getHighScorers(guesser: WordleGuesser) {
+//     const letters = getLetterCounts(guesser);
+//     const letters2 = letters.forEach((v, k) => letters.set(k, Math.abs((guesser.possible.size / 2) - v) + 0.5))
+//     console.log();
+//     console.log('Parsed letter counts for total poss: ', guesser.possible.size);
+//     console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
+//     const scores = Array.from(guesser.possible).map(word =>{
+//       const used = new Set();
+//       const myScore = Array.from(word).reduce((sum, c) => {
+//         if (used.has(c)) {
+//           return sum;
+//         } else {
+//           used.add(c);
+//           return (letters.get(c) || 0) + sum;
+//         }
+//       }, 0);
+//       return  [word, myScore] as [string, number];
+//     }).sort((a,b) => b[1] - a[1]);
+//     console.log();
+//     console.log('High scoring words for remaining letters are: ')
+//     console.log(scores.slice(0,10));
+//     return scores;
+// }
+
+// function getLetterCounts(guesser: WordleGuesser) {
+//     const letters = new Map();
+//     Array.from(guesser.possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
+//     console.log();
+//     console.log('Unfiltered letter counts: ')
+//     console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
+//     return letters;
+// }
+
+
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arose', [0,0,2,2,2]);
-guesser.handleResult('loose', [0,0,2,2,2]);
-// guesser.handleResult('those', [0,2,2,2,2]);
-// guesser.handleResult('oakum', [1,2,0,0,1]);
-// guesser.handleResult('skill', [2,2,2,0,0]);
+guesser.handleResult('arose', [1,0,0,0,1]);
+guesser.handleResult('dealt', [0,1,1,0,1]);
+guesser.handleResult('ketch', [1,1,1,0,0]);
 
 const letters = getLetterCounts(guesser.possible);
 const scores = getGuessFreqScores(words, letters, guesser.possible.size);
