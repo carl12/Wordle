@@ -2,7 +2,7 @@ const fs = require('fs');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
 const words: string[] = fs.readFileSync('./wordle/5words.txt')
     .toString().split(',')
-    .filter((word: string) => !word.endsWith('s'));
+    // .filter((word: string) => !word.endsWith('s'));
 const wordsSet = new Set(words);
 class WordleGame {
     myWord: string;
@@ -11,9 +11,9 @@ class WordleGame {
         // console.log(this.myWord);
     }
 
-    checkAnswer(ans: string): (0 | 1 | 2)[] | null {
+    checkAnswer(ans: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
+        if (ans.length != 5) return null;
         if (!wordsSet.has(ans)) { return null; }
-
         return Array.from(ans).map((c, i) => {
             if (c === this.myWord[i]) {
                 return 2;
@@ -21,7 +21,7 @@ class WordleGame {
                 return 1;
             }
             return 0;
-        });
+        }) as [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)];
     }
 }
 
@@ -97,7 +97,7 @@ class WordleGuesser {
 
     }
 
-    handleResult(guess: string, guessCharMatch: number[], debug = false) {
+    handleResult(guess: string, guessCharMatch: [number, number, number, number, number], debug = false) {
         const invalidChars = guess.split('')
             .filter((_, i) => guessCharMatch[i] === 0)
             .filter(c => !findAll(guess, c).some(i => guessCharMatch[i] === 2));
@@ -183,6 +183,9 @@ function convertCountToScore(val: number | undefined, max: number) {
     if (val == null) {
         return 0;
     }
+    if (max < 10) {
+        return val;
+    }
     if (val < max / 2) {
         return val;
     } else if (val < max) {
@@ -195,9 +198,9 @@ function convertCountToScore(val: number | undefined, max: number) {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('orate', [0, 0, 1, 1, 0]);
-guesser.handleResult('antic', [1, 1, 1, 0, 0]);
-// guesser.handleResult('haunt', [0,2,0,2,1]);
+guesser.handleResult('arose', [0,0,0,0,1]);
+guesser.handleResult('blind', [1,0,0,0,1]);
+// guesser.handleResult('tardy', [0,1,2,0,0]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
