@@ -98,7 +98,6 @@ class WordleGuesser {
         // Allow guess of any word
         const scores = getGuessFreqScores(words, letters, guesser.possible.size);
         return scores[0][0];
-
     }
 
     handleResult(guess: string, guessCharMatch: [number, number, number, number, number], debug = false) {
@@ -193,7 +192,7 @@ function getLetterCounts(possible: Set<string>): Map<string, number> {
     return letters;
 }
 
-function getGuessFreqScores(words: string[], letters: Map<string, number>, numPossible: number) {
+function getGuessFreqScores(words: string[], letters: Map<string, number>, numPossible: number, adjusted = true) {
     let scores = words.map(word => {
         const used = new Set();
         const myScore = Array.from(word).reduce((sum, c) => {
@@ -201,7 +200,11 @@ function getGuessFreqScores(words: string[], letters: Map<string, number>, numPo
                 return sum;
             } else {
                 used.add(c);
-                return convertCountToScore(letters.get(c), numPossible) + sum;
+                if (adjusted) {
+                    return convertToAdjustedScore(letters.get(c), numPossible) + sum;
+                } else {
+                    return getScore(letters.get(c), numPossible);
+                }
             }
         }, 0);
         return [word, myScore] as [string, number];
@@ -211,7 +214,11 @@ function getGuessFreqScores(words: string[], letters: Map<string, number>, numPo
     return scores;
 }
 
-function convertCountToScore(val: number | undefined, max: number) {
+function getScore(val: number | undefined, max: number): number {
+    return val ?? 0;
+}
+
+function convertToAdjustedScore(val: number | undefined, max: number): number {
     if (val == null) {
         return 0;
     }
@@ -269,7 +276,8 @@ guesser.handleResult('dealt', [0,1,1,0,1]);
 guesser.handleResult('ketch', [1,1,1,0,0]);
 
 const letters = getLetterCounts(guesser.possible);
-const scores = getGuessFreqScores(words, letters, guesser.possible.size);
+const adjustedScores = getGuessFreqScores(words, letters, guesser.possible.size);
+const rawScores = getGuessFreqScores(Array.from(guesser.possible), letters, guesser.possible.size, false);
 console.log();
 console.log(`Unfiltered letter counts out of total ${guesser.possible.size} possible words: `)
 console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
@@ -278,8 +286,11 @@ console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
 
 if (guesser.possible.size > 3) {
     console.log();
-    console.log('High scoring words for remaining letters are: ')
-    console.log(scores.slice(0, 10));
+    console.log('High adjusted scoring words for remaining letters are: ')
+    console.log(adjustedScores.slice(0, 10));
+    console.log();
+    console.log('High raw scoring words for remaining letters are: ')
+    console.log(rawScores.slice(0, 10));
     console.log();
     console.log(`Potential frequency guess ${guesser.getAnyFreqGuess()}`);
     console.log(`Potential valid frequency guess ${guesser.getValidFreqGuess()}`);
