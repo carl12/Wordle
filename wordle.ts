@@ -1,6 +1,6 @@
 const fs = require('fs');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
-const words: string[] = fs.readFileSync('./wordle/5words.txt')
+const words: string[] = fs.readFileSync('./wordle/5words2.txt')
     .toString().split(',')
     // .filter((word: string) => !word.endsWith('s'));
 const wordsSet = new Set(words);
@@ -99,8 +99,7 @@ class WordleGuesser {
 
     handleResult(guess: string, guessCharMatch: [number, number, number, number, number], debug = false) {
         const invalidChars = guess.split('')
-            .filter((_, i) => guessCharMatch[i] === 0)
-            .filter(c => !findAll(guess, c).some(i => guessCharMatch[i] === 2));
+            .filter((_, i) => guessCharMatch[i] === 0);
         const presentChars = guess.split('').filter((_, i) => guessCharMatch[i] === 1 || guessCharMatch[i] == 2);
         const misplacedChars = guessCharMatch
             .map((val, i) => (val === 1 ? [guess[i], i] : [guess[i], -1]))
@@ -124,7 +123,7 @@ function wordIsPossible(word: string, guess: string, guessCharMatch: number[], i
         if (debug) { console.log('asdf'); }
         // If word has a character which was marked as not in the right place, it cannot be the word
         return false;
-    } else if (invalidChars.some(c => word.includes(c))) {
+    } else if (hasInvalidChar(word, invalidChars, correctChars)) {
         if (debug) {
             console.log('asdf1'); console.log('invalid chars are ', invalidChars); console.log(guessCharMatch);
             console.log(guess.split(''));
@@ -140,6 +139,28 @@ function wordIsPossible(word: string, guess: string, guessCharMatch: number[], i
         return false;
     }
     return true;
+}
+
+function hasInvalidChar(word: string, invalidChars: string[], correctChars: [string, number][]): boolean {
+    const foundInvalids = invalidChars.filter(c => word.includes(c));
+    if (!foundInvalids?.length) {
+        // No found invalids => false
+        return false;
+    }
+    if (!correctChars.some(([c, _]) => word.includes(c))) {
+        // Word has invalid characters with no equivalent valid characters
+        return true;
+    }
+    for (const invalid of foundInvalids) {
+        const indexes = findAll(word, invalid);
+        for (const index of indexes) {
+            if (!correctChars.some(([validChar, validCharLoc]) => validChar === invalid && validCharLoc === index)) {
+                // Word has a character marked as invalid which is also marked as valid, but not in same space
+                return true;
+            } 
+        }
+    }
+    return false;
 }
 
 function findAll(str: string, val: string): number[] {
@@ -198,10 +219,10 @@ function convertCountToScore(val: number | undefined, max: number) {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arose', [0,0,0,0,1]);
-guesser.handleResult('blind', [1,0,0,0,1]);
-// guesser.handleResult('tardy', [0,1,2,0,0]);
-// guesser.handleResult('spiky', [2,0,2,1,0]);
+guesser.handleResult('arose', [0,0,2,2,2]);
+guesser.handleResult('loose', [0,0,2,2,2]);
+// guesser.handleResult('those', [0,2,2,2,2]);
+// guesser.handleResult('oakum', [1,2,0,0,1]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
 const letters = getLetterCounts(guesser.possible);
