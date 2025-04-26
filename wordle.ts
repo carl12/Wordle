@@ -1,8 +1,7 @@
 const fs = require('fs');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
 const words: string[] = fs.readFileSync('./wordle/5words2.txt')
-    .toString().split(',')
-    // .filter((word: string) => !word.endsWith('s'));
+    .toString().split(',');
 const wordsSet = new Set(words);
 class WordleGame {
     myWord: string;
@@ -11,18 +10,47 @@ class WordleGame {
         // console.log(this.myWord);
     }
 
-    checkAnswer(ans: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
-        if (ans.length != 5) return null;
-        if (!wordsSet.has(ans)) { return null; }
-        return Array.from(ans).map((c, i) => {
-            if (c === this.myWord[i]) {
-                return 2;
-            } else if (this.myWord.includes(c)) {
-                return 1;
-            }
-            return 0;
-        }) as [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)];
+    checkGuess(ans: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
+        return checkGuess(ans, this.myWord);
     }
+}
+
+function checkGuess(guess: string, solution: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
+    if (guess.length != 5) return null;
+    if (!wordsSet.has(guess)) { return null; }
+    const res = Array.from(guess).map((c, i) => {
+        if (c === solution[i]) {
+            return 2;
+        } else if (solution.includes(c) && Array.from(solution).some((answerChar, i) => answerChar === c && guess[i] !== answerChar)) {
+            // only show 1 if the character is present in the answer in a location that is not correct
+            // ie a guess with aaxxx for word babbb would be 02000. The first value would be 0 since although a is in the answer, it has
+            // already been found by the guess
+            // TODO: another behavior, if a guess has a double letter both of which are in the wrong place, only the first is marked as 1
+            return 1;
+        }
+        return 0;
+    }) as [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)];
+    // const otherRes = checkGuess2(guess, solution);
+    // if (otherRes?.some((a, i) => a !== res[i])) {
+    //     console.log('they dont match ', guess, solution, res, otherRes, );
+    // }
+    return res;
+}
+
+function checkGuess2(guess: string, solution: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
+    if (guess.length != 5) return null;
+    if (!wordsSet.has(guess)) { return null; }
+    return Array.from(guess).map((c, i) => {
+        if (c === solution[i]) {
+            return 2;
+        } else if (solution.includes(c)) {
+            // only show 1 if the character is present in the answer in a location that is not correct
+            // ie a guess with aaxxx for word babbb would be 02000. The first value would be 0 since although a is in the answer, it has
+            // already been found by the guess
+            return 1;
+        }
+        return 0;
+    }) as [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)];
 }
 
 class WordleGuesser {
@@ -37,7 +65,7 @@ class WordleGuesser {
     hasWon = false;
     constructor(game: WordleGame, strat = 0) {
         this.strat = strat;
-        this.possible = new Set(words);
+        this.possible = new Set(words.filter(w => !w.endsWith('s')));
         this.game = game;
     }
 
@@ -48,7 +76,7 @@ class WordleGuesser {
 
         const guess = word == null ? this.getStratGuess() : word;
         console.log(guess);
-        const res = this.game.checkAnswer(guess);
+        const res = this.game.checkGuess(guess);
         if (res == null) {
             console.log(`Guess ${guess} is not in the word dictionary. Ignoring`);
         } else {
@@ -203,7 +231,7 @@ function getGuessFreqScores(words: string[], letters: Map<string, number>, numPo
                 if (adjusted) {
                     return convertToAdjustedScore(letters.get(c), numPossible) + sum;
                 } else {
-                    return getScore(letters.get(c), numPossible);
+                    return getScore(letters.get(c)) + sum;
                 }
             }
         }, 0);
@@ -214,7 +242,7 @@ function getGuessFreqScores(words: string[], letters: Map<string, number>, numPo
     return scores;
 }
 
-function getScore(val: number | undefined, max: number): number {
+function getScore(val: number | undefined): number {
     return val ?? 0;
 }
 
@@ -222,9 +250,9 @@ function convertToAdjustedScore(val: number | undefined, max: number): number {
     if (val == null) {
         return 0;
     }
-    if (max < 10) {
-        return val;
-    }
+    // if (max < 10) {
+    //     return val;
+    // }
     if (val < max / 2) {
         return val;
     } else if (val < max) {
@@ -233,6 +261,54 @@ function convertToAdjustedScore(val: number | undefined, max: number): number {
         // console.log('weird', val, max);
         return 0;
     }
+}
+
+type guessOutcome = { guess: string, numOutcomes: number, avgSize: number, outcome: Map<string, string[]>, outcomeStringed: string[], roughAvgGuess: number, recursiveOutcomes: any };
+
+function rateGuessByOutcome({guesses, possible, sort = 'roughAvgGuess', recursive = false }:
+    { guesses: string[], possible: Set<string>, sort?: 'roughAvgGuess' | 'numOutcomes' | 'avgSize', recursive?: boolean }): guessOutcome[] {
+    const a = guesses.map(guess => {
+        const outcome = getGuessOutcomes(guess, possible);
+
+        const outcomeSummary = Array.from(outcome).map(([key, val]) => [key, val.length, val.join(',').slice(0, 100)] as [string, number, string]).sort((a, b) => b[1] - a[1]);
+        const outcomeStringed = outcomeSummary.map((a) => JSON.stringify(a));
+        if (!outcome.size) {
+            return { guess, numOutcomes: Infinity, avgSize: Infinity, outcome, roughAvgGuess: Infinity, outcomeStringed, recursiveOutcomes: [] };
+        }
+        let recursiveOutcomes: any[] = [];
+        if (recursive) {
+            console.log('recursing', outcome.size, guess);
+            recursiveOutcomes = Array.from(outcome.values()).filter(pos => pos.length > 2).map(possible => rateGuessByOutcome({guesses, possible: new Set(possible), sort })?.[0]).map(res => ({ word: res?.guess, roughAvgGuess: res?.roughAvgGuess }));
+        }
+        const numOutcomes = outcome.size;
+        const avgSize = Array.from(outcome.values()).reduce((sum, val) => sum + (val.length * val.length), 0) / possible.size;
+        const roughAvgGuess = Array.from(outcome.keys()).reduce((sum, key) => {
+            if (key === '2,2,2,2,2') {
+                return sum;
+            }
+            const additionalGuesses = (Math.log(outcome.get(key)!.length) / Math.log(4)) + 1;
+            return sum + (additionalGuesses * outcome.get(key)!.length);
+        }, 0) / possible.size;
+        return { guess, numOutcomes, avgSize, outcome, outcomeStringed, roughAvgGuess, recursiveOutcomes };
+    }).sort((a, b) => {
+        return a[sort] - b[sort];
+    });
+    return a;
+}
+
+
+function getGuessOutcomes(guess: string, possible: Set<string>): Map<string, string[]> {
+    const outcomes = new Map();
+    Array.from(possible).forEach(word => {
+        const outcome = checkGuess(guess, word);
+        if (!outcome) {
+            return;
+        }
+        const outcomeStr = outcome.join(',');
+        outcomes.set(outcomeStr, outcomes.get(outcomeStr) ?? []);
+        outcomes.get(outcomeStr)?.push(word);
+    });
+    return outcomes;
 }
 
 // function getHighScorers(guesser: WordleGuesser) {
@@ -271,9 +347,11 @@ function convertToAdjustedScore(val: number | undefined, max: number): number {
 
 const a = new WordleGame();
 const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('arose', [1,0,0,0,1]);
-guesser.handleResult('dealt', [0,1,1,0,1]);
-guesser.handleResult('ketch', [1,1,1,0,0]);
+guesser.handleResult('caret', [0,0,0,0,0]);
+guesser.handleResult('sonly', [0,1,1,0,0]);
+// guesser.handleResult('blown', [0,0,2,2,2]);
+// guesser.handleResult('spiky', [2,0,2,1,0]);
+// guesser.handleResult('skill', [2,2,2,0,0]);
 
 const letters = getLetterCounts(guesser.possible);
 const adjustedScores = getGuessFreqScores(words, letters, guesser.possible.size);
@@ -287,13 +365,31 @@ console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
 if (guesser.possible.size > 3) {
     console.log();
     console.log('High adjusted scoring words for remaining letters are: ')
-    console.log(adjustedScores.slice(0, 10));
+    console.log(adjustedScores.slice(0, 3));
     console.log();
-    console.log('High raw scoring words for remaining letters are: ')
-    console.log(rawScores.slice(0, 10));
+    console.log('High raw scoring valid words for remaining letters are: ')
+    console.log(rawScores.slice(0, 3));
     console.log();
     console.log(`Potential frequency guess ${guesser.getAnyFreqGuess()}`);
     console.log(`Potential valid frequency guess ${guesser.getValidFreqGuess()}`);
+
+    console.log();
+    console.log('Rated by outcome:');
+    const res1 = rateGuessByOutcome({guesses: Array.from(guesser.possible), possible: guesser.possible, recursive: false});
+    console.log(res1.slice(0, 5).map(word => ({
+        guess: word.guess,
+        avg: word.avgSize,
+        count: word.outcome.size,
+        expGuess: word.roughAvgGuess,
+        outcomeSizes: word.outcomeStringed.map(a => Number(a.split(',')[5])).slice(0, 100),
+        outComesStringed: word.outcomeStringed.slice(0, 40),
+        recursive: word.recursiveOutcomes.map((out: any) => JSON.stringify(out)),
+    })));
+
+    // console.log();
+    // console.log('Valid rated by outcome:');
+    // const res = rateGuessByOutcome({guesses: Array.from(guesser.possible), possible: guesser.possible});
+    // console.log(res.slice(0, 10).map(word => ({ guess: word.guess, avg: word.avgSize, expGuess: word.roughAvgGuess, outComesStringed: word.outcomeStringed.slice(0, 20) })));
 
     console.log(guesser.gueses);
 } else {
