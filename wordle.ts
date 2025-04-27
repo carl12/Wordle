@@ -264,31 +264,24 @@ function convertToAdjustedScore(val: number | undefined, max: number): number {
 }
 
 type guessOutcome = { guess: string, numOutcomes: number, avgSize: number, outcome: Map<string, string[]>, outcomeStringed: string[], roughAvgGuess: number, recursiveOutcomes: any };
-
-function rateGuessByOutcome({guesses, possible, sort = 'roughAvgGuess', recursive = false }:
-    { guesses: string[], possible: Set<string>, sort?: 'roughAvgGuess' | 'numOutcomes' | 'avgSize', recursive?: boolean }): guessOutcome[] {
-    const a = guesses.map(guess => {
+type rateArgs = { potentialGuesses: string[], possible: Set<string>, sort?: 'roughAvgGuess' | 'numOutcomes' | 'avgSize', recursive?: boolean }; 
+function rateGuessByOutcome({potentialGuesses, possible, sort = 'roughAvgGuess', recursive = false }: rateArgs): guessOutcome[] {
+    const a = potentialGuesses.map(guess => {
         const outcome = getGuessOutcomes(guess, possible);
-
-        const outcomeSummary = Array.from(outcome).map(([key, val]) => [key, val.length, val.join(',').slice(0, 100)] as [string, number, string]).sort((a, b) => b[1] - a[1]);
-        const outcomeStringed = outcomeSummary.map((a) => JSON.stringify(a));
         if (!outcome.size) {
-            return { guess, numOutcomes: Infinity, avgSize: Infinity, outcome, roughAvgGuess: Infinity, outcomeStringed, recursiveOutcomes: [] };
+            return { guess, numOutcomes: Infinity, avgSize: Infinity, outcome, roughAvgGuess: Infinity, outcomeStringed: [], recursiveOutcomes: [] };
         }
+        const outcomeStringed = stringifyOutcome(outcome); 
+
         let recursiveOutcomes: any[] = [];
         if (recursive) {
+            // TODO: verify this is working correctly and extend functionalty. Maybe add depth?
             console.log('recursing', outcome.size, guess);
-            recursiveOutcomes = Array.from(outcome.values()).filter(pos => pos.length > 2).map(possible => rateGuessByOutcome({guesses, possible: new Set(possible), sort })?.[0]).map(res => ({ word: res?.guess, roughAvgGuess: res?.roughAvgGuess }));
+            recursiveOutcomes = Array.from(outcome.values()).filter(pos => pos.length > 2).map(possible => rateGuessByOutcome({potentialGuesses, possible: new Set(possible), sort })?.[0]).map(res => ({ word: res?.guess, roughAvgGuess: res?.roughAvgGuess }));
         }
         const numOutcomes = outcome.size;
         const avgSize = Array.from(outcome.values()).reduce((sum, val) => sum + (val.length * val.length), 0) / possible.size;
-        const roughAvgGuess = Array.from(outcome.keys()).reduce((sum, key) => {
-            if (key === '2,2,2,2,2') {
-                return sum;
-            }
-            const additionalGuesses = (Math.log(outcome.get(key)!.length) / Math.log(4)) + 1;
-            return sum + (additionalGuesses * outcome.get(key)!.length);
-        }, 0) / possible.size;
+        const roughAvgGuess = getAvgGuess(outcome, possible.size);
         return { guess, numOutcomes, avgSize, outcome, outcomeStringed, roughAvgGuess, recursiveOutcomes };
     }).sort((a, b) => {
         return a[sort] - b[sort];
@@ -296,6 +289,79 @@ function rateGuessByOutcome({guesses, possible, sort = 'roughAvgGuess', recursiv
     return a;
 }
 
+function rateDordleByOutcome(args: rateArgs & { possible2: Set<string>}): {
+    guess: string,
+    avgGuess1: number,
+    avgGuess2: number,
+    sumAvgGuess: number,
+    maxAvgGuess: number,
+    minAvgGuess: number,
+    numOutcomes1: number,
+    numOutcomes2: number,
+    outcomeSizes1: number[],
+    outcomeSizes2: number[],
+    outcomeStringed1: string[],
+    outcomeStringed2: string[],
+}[] {
+    const { potentialGuesses, possible, possible2, sort = 'roughAvgGuess', recursive = false } = args; 
+    const mergedOutcomes = potentialGuesses.map(guess => {
+        const outcome1 = getGuessOutcomes(guess, possible);
+        const outcome2 = getGuessOutcomes(guess, possible2);
+        if (!outcome1.size || !outcome2.size) {
+            const a = {
+                guess,
+                avgGuess1: Infinity,
+                avgGuess2: Infinity,
+                sumAvgGuess: Infinity,
+                maxAvgGuess: Infinity,
+                minAvgGuess: Infinity,
+                numOutcomes1: Infinity,
+                numOutcomes2: Infinity,
+                outcomeSizes1: [],
+                outcomeSizes2: [],
+                outcomeStringed1: stringifyOutcome(outcome1),
+                outcomeStringed2: stringifyOutcome(outcome2),
+            };
+            return a;
+        }
+        const avgGuess1 =  getAvgGuess(outcome1, possible.size);
+        const avgGuess2 = getAvgGuess(outcome2, possible2.size);
+        return {
+            guess,
+            avgGuess1: avgGuess1,
+            avgGuess2: avgGuess2,
+            sumAvgGuess: avgGuess1 + avgGuess2,
+            maxAvgGuess: Math.max(avgGuess1, avgGuess2),
+            minAvgGuess: Math.min(avgGuess1, avgGuess2),
+            numOutcomes1: outcome1.size,
+            numOutcomes2: outcome2.size,
+            outcomeSizes1: stringifyOutcome(outcome1).map(a => Number(a.split(',')[5])).slice(0, 100),
+            outcomeSizes2: stringifyOutcome(outcome2).map(a => Number(a.split(',')[5])).slice(0, 100),
+            outcomeStringed1: stringifyOutcome(outcome1),
+            outcomeStringed2: stringifyOutcome(outcome2),
+        };
+    });
+    
+    return mergedOutcomes;
+}
+
+function getAvgGuess(outcome: Map<string, string[]>, numPossible: number): number {
+    return Array.from(outcome.keys()).reduce((sum, key) => {
+        if (key === '2,2,2,2,2') {
+            return sum;
+        }
+        const additionalGuesses = (Math.log(outcome.get(key)!.length) / Math.log(4)) + 1;
+        return sum + (additionalGuesses * outcome.get(key)!.length);
+    }, 0) / numPossible;
+}
+
+function calcExpectedGuess(key: string, result: string[]): number {
+    if (key === '2,2,2,2,2') {
+        return 0;
+    }
+    const additionalGuesses = (Math.log(result.length) / Math.log(4)) + 1;
+    return additionalGuesses;
+}
 
 function getGuessOutcomes(guess: string, possible: Set<string>): Map<string, string[]> {
     const outcomes = new Map();
@@ -311,80 +377,87 @@ function getGuessOutcomes(guess: string, possible: Set<string>): Map<string, str
     return outcomes;
 }
 
-// function getHighScorers(guesser: WordleGuesser) {
-//     const letters = getLetterCounts(guesser);
-//     const letters2 = letters.forEach((v, k) => letters.set(k, Math.abs((guesser.possible.size / 2) - v) + 0.5))
-//     console.log();
-//     console.log('Parsed letter counts for total poss: ', guesser.possible.size);
-//     console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
-//     const scores = Array.from(guesser.possible).map(word =>{
-//       const used = new Set();
-//       const myScore = Array.from(word).reduce((sum, c) => {
-//         if (used.has(c)) {
-//           return sum;
-//         } else {
-//           used.add(c);
-//           return (letters.get(c) || 0) + sum;
-//         }
-//       }, 0);
-//       return  [word, myScore] as [string, number];
-//     }).sort((a,b) => b[1] - a[1]);
-//     console.log();
-//     console.log('High scoring words for remaining letters are: ')
-//     console.log(scores.slice(0,10));
-//     return scores;
-// }
+function stringifyOutcome(outcome: Map<string, string[]>, lineLength = 100, ): string[] {
+    const outcomeSummary = Array.from(outcome)
+        .map(([key, val]) => [
+            key, 
+            val.length, val.join(',').slice(0, lineLength)
+        ] as [string, number, string])
+        .sort((a, b) => b[1] - a[1]);
+    return outcomeSummary.map((a) => JSON.stringify(a));
+}
 
-// function getLetterCounts(guesser: WordleGuesser) {
-//     const letters = new Map();
-//     Array.from(guesser.possible).forEach(word => Array.from(word).forEach(c => letters.set(c, (letters.get(c) || 0) + 1)));
-//     console.log();
-//     console.log('Unfiltered letter counts: ')
-//     console.log(Array.from(letters).sort((a,b) => b[1] - a[1]));
-//     return letters;
-// }
+function makeDouble(g1: WordleGuesser, g2: WordleGuesser) {
+    return function doubleHandle(guess: string, guessCharMatch1: [number, number, number, number, number], guessCharMatch2: [number, number, number, number, number]) {
+        g1.handleResult(guess, guessCharMatch1);
+        g2.handleResult(guess, guessCharMatch2);
+    }
 
+}
 
 const a = new WordleGame();
-const guesser = new WordleGuesser(a, 2);
-guesser.handleResult('caret', [0,0,0,0,0]);
-guesser.handleResult('sonly', [0,1,1,0,0]);
+const a1 = new WordleGame();
+const a2 = new WordleGame();
+const guesser = new WordleGuesser(a);
+const guesser1 = new WordleGuesser(a1);
+const guesser2 = new WordleGuesser(a2);
+const handle = makeDouble(guesser1, guesser2);
+handle('caret', [2,0,0,0,0], [0,2,0,1,0]);
+handle('hilum', [1,1,1,0,0], [0,0,0,1,1]);
+// handle('inert', [0,0,0,0,0], [2,2,2,2,2]);
+// handle('bulgy', [0,0,0,2,2], [0,0,0,0,0]);
+// guesser1.handleResult('caret', [0,1,0,1,0]);
+// guesser1.handleResult('slang', [0,2,2,0,0]);
+// guesser1.handleResult('dryad', [0,1,0,0,0]);
+
+// guesser2.handleResult('caret', [2,2,2,0,2]);
+// guesser2.handleResult('slang', [0,0,1,0,0]);
+// guesser2.handleResult('dryad', [2,2,2,2,2]);
+
+// guesser.handleResult('caret', [0,0,0,0,0]);
+// guesser.handleResult('sonly', [0,1,1,0,0]);
 // guesser.handleResult('blown', [0,0,2,2,2]);
 // guesser.handleResult('spiky', [2,0,2,1,0]);
 // guesser.handleResult('skill', [2,2,2,0,0]);
 
 const letters = getLetterCounts(guesser.possible);
-const adjustedScores = getGuessFreqScores(words, letters, guesser.possible.size);
-const rawScores = getGuessFreqScores(Array.from(guesser.possible), letters, guesser.possible.size, false);
-console.log();
-console.log(`Unfiltered letter counts out of total ${guesser.possible.size} possible words: `)
-console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
+// const adjustedScores = getGuessFreqScores(words, letters, guesser.possible.size);
+// const rawScores = getGuessFreqScores(Array.from(guesser.possible), letters, guesser.possible.size, false);
+// console.log();
+// console.log(`Unfiltered letter counts out of total ${guesser.possible.size} possible words: `)
+// console.log(Array.from(letters).sort((a, b) => b[1] - a[1]));
 // letters.set('y', 0);
 // letters.set('u', 0);
 
 if (guesser.possible.size > 3) {
-    console.log();
-    console.log('High adjusted scoring words for remaining letters are: ')
-    console.log(adjustedScores.slice(0, 3));
-    console.log();
-    console.log('High raw scoring valid words for remaining letters are: ')
-    console.log(rawScores.slice(0, 3));
-    console.log();
-    console.log(`Potential frequency guess ${guesser.getAnyFreqGuess()}`);
-    console.log(`Potential valid frequency guess ${guesser.getValidFreqGuess()}`);
+    // console.log();
+    // console.log('High adjusted scoring words for remaining letters are: ')
+    // console.log(adjustedScores.slice(0, 3));
+    // console.log();
+    // console.log('High raw scoring valid words for remaining letters are: ')
+    // console.log(rawScores.slice(0, 3));
+    // console.log();
+    // console.log(`Potential frequency guess ${guesser.getAnyFreqGuess()}`);
+    // console.log(`Potential valid frequency guess ${guesser.getValidFreqGuess()}`);
 
+    // console.log();
+    // console.log('Rated by outcome:');
+    // const res0 = rateGuessByOutcome({potentialGuesses: Array.from(guesser.possible), possible: guesser.possible, recursive: false});
+    // console.log(res0.slice(0, 5).map(word => ({
+    //     guess: word.guess,
+    //     avg: word.avgSize,
+    //     count: word.outcome.size,
+    //     expGuess: word.roughAvgGuess,
+    //     outcomeSizes: word.outcomeStringed.map(a => Number(a.split(',')[5])).slice(0, 100),
+    //     outComesStringed: word.outcomeStringed.slice(0, 40),
+    //     recursive: word.recursiveOutcomes.map((out: any) => JSON.stringify(out)),
+    // })));
     console.log();
     console.log('Rated by outcome:');
-    const res1 = rateGuessByOutcome({guesses: Array.from(guesser.possible), possible: guesser.possible, recursive: false});
-    console.log(res1.slice(0, 5).map(word => ({
-        guess: word.guess,
-        avg: word.avgSize,
-        count: word.outcome.size,
-        expGuess: word.roughAvgGuess,
-        outcomeSizes: word.outcomeStringed.map(a => Number(a.split(',')[5])).slice(0, 100),
-        outComesStringed: word.outcomeStringed.slice(0, 40),
-        recursive: word.recursiveOutcomes.map((out: any) => JSON.stringify(out)),
-    })));
+    // const res1 = rateDordleByOutcome({potentialGuesses: Array.from(guesser1.possible).concat(Array.from(guesser2.possible)), possible: guesser1.possible, possible2: guesser2.possible });
+    const res1 = rateDordleByOutcome({potentialGuesses: words, possible: guesser1.possible, possible2: guesser2.possible });
+    res1.sort((a, b) => a.avgGuess1 - b.avgGuess1);
+    console.log(res1.slice(0, 5));
 
     // console.log();
     // console.log('Valid rated by outcome:');
