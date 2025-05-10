@@ -64,10 +64,10 @@ class WordleGuesser {
     guesses: [string, number[]][] = [];
     game: WordleGame;
     hasWon = false;
-    constructor(game: WordleGame, strat = 0) {
+    constructor(game: WordleGame, filterS: boolean = false, strat = 0) {
         this.strat = strat;
         this.possible = new Set(words
-            .filter(w => !w.endsWith('s'))
+            .filter(w => !filterS || !w.endsWith('s'))
         );
         this.game = game;
     }
@@ -117,7 +117,7 @@ class WordleGuesser {
         const arr = Array.from(this.possible);
         const charCounts = getLetterCounts(this.possible);
         // restrict options to possible words
-        const scores = getGuessFreqScores(arr, letters, guesser.possible.size);
+        const scores = getGuessFreqScores(arr, charCounts, this.possible.size);
         return scores[0][0];
     }
 
@@ -127,7 +127,7 @@ class WordleGuesser {
         }
         const charCounts = getLetterCounts(this.possible);
         // Allow guess of any word
-        const scores = getGuessFreqScores(words, letters, guesser.possible.size);
+        const scores = getGuessFreqScores(words, charCounts, this.possible.size);
         return scores[0][0];
     }
 
@@ -404,21 +404,25 @@ function makeSingle(g1: WordleGuesser) {
     }
 }
 
-function logGameState(game1: WordleGuesser, game2?: WordleGuesser): void {
+function logGameState(game1: WordleGuesser, game2?: WordleGuesser, guessInfo: guessOutcome[] = []): void {
     let fileName;
     let output;
+    const date = new Date().toLocaleString().split(',')[0];
     if (game2) {
         fileName = 'dordleLog.txt';
         output = 'dordleLog.txt';
         console.log('Not implemented yet');
     } else {
         fileName = 'wordleLog.txt';
+        const possibleList = Array.from(game1.possible);
+        const guesses = guessInfo?.slice(0, 10)
         output = JSON.stringify({
-            summary: { guesses: game1.guesses, numPossible: game1.possible.size, possibleSample: Array.from(game1.possible).slice(0, 5) },
+            date,
             guesses: game1.guesses,
             numPossible: game1.possible.size,
-            charInfo: { invalid: game1.invalidChars, valid: game1.correctChars, correct: game1.correctChars },
-            possible: Array.from(game1.possible),
+            charInfo: { invalid: game1.invalidChars, misplaced: game1.misplacedChars, correct: game1.correctChars },
+            possible: possibleList.length > 10 ? possibleList.slice(0, 10).concat([`and ${possibleList.length - 10} more ...`]) : possibleList,
+            ...(guesses?.length ? { potentials: guesses.slice(0, 5).map(g => ([ g.guess, g.numOutcomes, g.roughAvgGuess.toFixed(2) ]))} : {})
         });
         console.log('logging game state for single game to ' + fileName);
         fs.appendFileSync(path.join(__dirname, fileName), output + '\n');
@@ -429,9 +433,11 @@ playWordle();
 function playWordle() {
     const oldGuessStyle = false;
     const a = new WordleGame();
-    const guesser = new WordleGuesser(a);
-    guesser.handleResult('raise', [1,0,0,0,0]);
-    logGameState(guesser);
+    const guesser = new WordleGuesser(a, true);
+    guesser.handleResult('raise', [1,0,2,0,2]);
+    // guesser.handleResult('nobly', [0,0,1,1,2]);
+    const res0 = rateGuessByOutcome({potentialGuesses: words, possible: guesser.possible, recursive: false});
+    logGameState(guesser, undefined, res0);
     const letters = getLetterCounts(guesser.possible);
     if (guesser.possible.size > 2) {
         if (oldGuessStyle) {
@@ -439,16 +445,21 @@ function playWordle() {
         }
         console.log();
         console.log('Rated by outcome:');
-        const res0 = rateGuessByOutcome({potentialGuesses: words, possible: guesser.possible, recursive: false});
+
+        const res1 = res0.filter(a => a.guess === 'hotly');
+
         console.log(res0.slice(0, 5).map(word => ({
             guess: word.guess,
             avg: word.avgSize,
-            count: word.outcome.size,
+            outcomeCounts: word.outcome.size,
             expGuess: word.roughAvgGuess,
             outcomeSizes: word.outcomeStringed.map(a => Number(a.split(',')[5])).slice(0, 100),
             outComesStringed: word.outcomeStringed.slice(0, 40),
             recursive: word.recursiveOutcomes.map((out: any) => JSON.stringify(out)),
         })));
+        console.log('Other high schoring guesses');
+        console.log(JSON.stringify(res0.slice(5, 20).map(word => ([ word.guess, word.outcome.size, word.roughAvgGuess.toFixed(2) ]))));
+
     } else {
         console.log();
         if (guesser.possible.size == 1) {
@@ -472,7 +483,7 @@ function playWordle() {
     }
 }
 
-playDordle();
+// playDordle();
 function playDordle() {
     const a1 = new WordleGame();
     const a2 = new WordleGame();
