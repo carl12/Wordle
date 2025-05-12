@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
-const words: string[] = fs.readFileSync('./wordle/5words3.txt')
+const words: string[] = fs.readFileSync('./wordle/5words4.txt')
     .toString().split('\n');
 const wordsSet = new Set(words);
 class WordleGame {
@@ -14,6 +14,17 @@ class WordleGame {
     checkGuess(ans: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
         return checkGuess(ans, this.myWord);
     }
+}
+
+function naiveWordFilter(disallowed: string[], correctChars: string[]): string[] {
+    return words.filter(w => {
+        if (disallowed.some(c => w.includes(c))) {
+            return false;
+        } else if (correctChars.some((c, i) => c && w[i] !== c)) {
+            return false;
+        }
+        return true;
+    });
 }
 
 function checkGuess(guess: string, solution: string): [(0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2), (0 | 1 | 2)] | null {
@@ -433,8 +444,9 @@ playWordle();
 function playWordle() {
     const oldGuessStyle = false;
     const a = new WordleGame();
-    const guesser = new WordleGuesser(a, true);
-    guesser.handleResult('raise', [1,0,2,0,2]);
+    const guesser = new WordleGuesser(a, false);
+    guesser.handleResult('raise', [0,0,1,0,1]);
+    guesser.handleResult('lined', [0,2,0,2,0]);
     // guesser.handleResult('nobly', [0,0,1,1,2]);
     const res0 = rateGuessByOutcome({potentialGuesses: words, possible: guesser.possible, recursive: false});
     logGameState(guesser, undefined, res0);
@@ -504,3 +516,4 @@ function playDordle() {
     console.log(res1.slice(0, 5));
 }
 
+console.log(naiveWordFilter(['r','a','s','l','n','d'],['','i', '', 'e']));

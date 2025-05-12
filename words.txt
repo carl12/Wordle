@@ -4680,6 +4680,7 @@ bicarb
 bicarbonate
 bicentenary
 bicentennial
+bicep
 biceps
 bicker
 bickering
@@ -8522,6 +8523,7 @@ citruses
 cittern
 city
 cityscape
+civet
 civic
 civics
 civies
@@ -37454,6 +37456,7 @@ pipelines
 piper
 pipers
 pipes
+pipet
 pipette
 pipettes
 pipework

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-const input = '5words2.txt';
-const inputDelimiter = ',';
-const output = '5words4.txt';
+const input = 'words.txt';
+const inputDelimiter = '\n';
+const output = '5words3.txt';
 const outputDelimiter = '\n';
 
 const words5 = fs.readFileSync(path.join(__dirname, input))

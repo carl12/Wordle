@@ -344,6 +344,7 @@ betel
 bevel
 bevvy
 bible
+bicep
 bided
 bides
 bidet
@@ -678,6 +679,7 @@ cinch
 circa
 cited
 cites
+civet
 civic
 civil
 claim
@@ -1640,6 +1642,7 @@ gully
 gulps
 guppy
 gurus
+gussy
 gusto
 gusts
 gusty
@@ -2682,6 +2685,7 @@ pious
 piped
 piper
 pipes
+pipet
 pipit
 pique
 pitch
@@ -3610,6 +3614,7 @@ styli
 suave
 sucks
 sudan
+sudsy
 suede
 sugar
 suing
