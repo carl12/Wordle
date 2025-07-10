@@ -4,6 +4,7 @@ const path = require('path');
 const words: string[] = fs.readFileSync('./wordle/5words4.txt')
     .toString().split('\n');
 const wordsSet = new Set(words);
+const badNYTWords = ['bonny', 'fondu', 'nonny', 'plumy'];
 class WordleGame {
     myWord: string;
     constructor() {
@@ -75,10 +76,11 @@ class WordleGuesser {
     guesses: [string, number[]][] = [];
     game: WordleGame;
     hasWon = false;
-    constructor(game: WordleGame, filterS: boolean = false, strat = 0) {
+    constructor(game: WordleGame, filterS: boolean = false, excludeWords: string[] = [], strat = 0) {
         this.strat = strat;
         this.possible = new Set(words
             .filter(w => !filterS || !w.endsWith('s'))
+            .filter(w => !excludeWords.includes(w))
         );
         this.game = game;
     }
@@ -278,8 +280,11 @@ function convertToAdjustedScore(val: number | undefined, max: number): number {
 }
 
 type guessOutcome = { guess: string, numOutcomes: number, avgSize: number, outcome: Map<string, string[]>, outcomeStringed: string[], roughAvgGuess: number, recursiveOutcomes: any };
-type rateArgs = { potentialGuesses: string[], possible: Set<string>, sort?: 'roughAvgGuess' | 'numOutcomes' | 'avgSize', recursive?: boolean };
-function rateGuessByOutcome({potentialGuesses, possible, sort = 'roughAvgGuess', recursive = false }: rateArgs): guessOutcome[] {
+type rateArgs = { potentialGuesses: string[], possible: Set<string>, sort?: 'roughAvgGuess' | 'numOutcomes' | 'avgSize', recursive?: boolean, logging?: 'none' | 'basic' };
+function rateGuessByOutcome({potentialGuesses, possible, sort = 'roughAvgGuess', recursive = false, logging = 'none' }: rateArgs): guessOutcome[] {
+    if (logging !== 'none') {
+        console.log(`Rating ${potentialGuesses.length} guesses with ${possible.size} possible words`);
+    }
     const a = potentialGuesses.map(guess => {
         const outcome = getGuessOutcomes(guess, possible);
         if (!outcome.size) {
@@ -291,7 +296,7 @@ function rateGuessByOutcome({potentialGuesses, possible, sort = 'roughAvgGuess',
         if (recursive) {
             // TODO: verify this is working correctly and extend functionalty. Maybe add depth?
             console.log('recursing', outcome.size, guess);
-            recursiveOutcomes = Array.from(outcome.values()).filter(pos => pos.length > 2).map(possible => rateGuessByOutcome({potentialGuesses, possible: new Set(possible), sort })?.[0]).map(res => ({ word: res?.guess, roughAvgGuess: res?.roughAvgGuess }));
+            recursiveOutcomes = Array.from(outcome.values()).filter(pos => pos.length > 2).map(possible => rateGuessByOutcome({potentialGuesses, possible: new Set(possible), sort, logging })?.[0]).map(res => ({ word: res?.guess, roughAvgGuess: res?.roughAvgGuess }));
         }
         const numOutcomes = outcome.size;
         const avgSize = Array.from(outcome.values()).reduce((sum, val) => sum + (val.length * val.length), 0) / possible.size;
@@ -359,6 +364,46 @@ function rateDordleByOutcome(args: rateArgs & { possible2: Set<string>}): {
     return mergedOutcomes;
 }
 
+function rateQuordleByOutcome(args: rateArgs & { possible2: Set<string>, possible3: Set<string>, possible4: Set<string>}): {
+    guess: string,
+    avgGuessList: number[],
+    sumAvgGuess: number,
+    maxAvgGuess: number,
+    minAvgGuess: number,
+    numOutcomesList: number[],
+    outcomeSizesList: number[][],
+    outcomeStringedList: string,
+}[] {
+    const { potentialGuesses, possible, possible2, possible3, possible4, sort = 'roughAvgGuess', recursive = false } = args;
+    const mergedOutcomes = potentialGuesses.map(guess => {
+        const outcome1 = getGuessOutcomes(guess, possible);
+        const outcome2 = getGuessOutcomes(guess, possible2);
+        const outcome3 = getGuessOutcomes(guess, possible3);
+        const outcome4 = getGuessOutcomes(guess, possible4);
+        const strOutComes = [outcome1, outcome2, outcome3, outcome4].map(outcome => stringifyOutcome(outcome));
+        const avgGuess1 = zeroifyNan(getAvgGuess(outcome1, possible.size));
+        const avgGuess2 = zeroifyNan(getAvgGuess(outcome2, possible2.size));
+        const avgGuess3 = zeroifyNan(getAvgGuess(outcome3, possible3.size));
+        const avgGuess4 = zeroifyNan(getAvgGuess(outcome4, possible4.size));
+        return {
+            guess,
+            avgGuessList: [avgGuess1, avgGuess2, avgGuess3, avgGuess4],
+            sumAvgGuess: avgGuess1 + avgGuess2 + avgGuess3 + avgGuess4,
+            maxAvgGuess: Math.max(avgGuess1, avgGuess2, avgGuess3, avgGuess4),
+            minAvgGuess: Math.min(avgGuess1, avgGuess2, avgGuess3, avgGuess4),
+            numOutcomesList: [outcome1.size, outcome2.size, outcome3.size, outcome4.size],
+            outcomeSizesList: strOutComes.map(strs => strs.map(a => Number(a.split(',')[5])).slice(0, 100)),
+            outcomeStringedList: strOutComes.map(strs => strs.join('\n')).join('\n\n'),
+        };
+    });
+
+    return mergedOutcomes;
+}
+
+function zeroifyNan(a: number): number {
+    return isNaN(a) ? 0 : a;
+}
+
 function getAvgGuess(outcome: Map<string, string[]>, numPossible: number): number {
     return Array.from(outcome.keys()).reduce((sum, key) => {
         if (key === '2,2,2,2,2') {
@@ -395,18 +440,27 @@ function stringifyOutcome(outcome: Map<string, string[]>, lineLength = 60, ): st
     const outcomeSummary = Array.from(outcome)
         .map(([key, val]) => [
             key,
-            val.length, val.join(',').slice(0, lineLength)
+            val.length, val.join(',').length > lineLength ? val.join(',').slice(0, lineLength) + '...' : val.join(',').slice(0, lineLength)
         ] as [string, number, string])
         .sort((a, b) => b[1] - a[1]);
+
     return outcomeSummary.map((a) => JSON.stringify(a));
 }
 
 function makeDouble(g1: WordleGuesser, g2: WordleGuesser) {
-    return function doubleHandle(guess: string, guessCharMatch1: [number, number, number, number, number], guessCharMatch2: [number, number, number, number, number]) {
+    return (guess: string, guessCharMatch1: [number, number, number, number, number], guessCharMatch2: [number, number, number, number, number]) => {
         g1.handleResult(guess, guessCharMatch1);
         g2.handleResult(guess, guessCharMatch2);
     }
+}
 
+function makeQuordle(g1: WordleGuesser, g2: WordleGuesser, g3: WordleGuesser, g4: WordleGuesser) {
+    return (guess: string, guessCharMatch1: [number, number, number, number, number], guessCharMatch2: [number, number, number, number, number], guessCharMatch3: [number, number, number, number, number], guessCharMatch4: [number, number, number, number, number]) => {
+        g1.handleResult(guess, guessCharMatch1);
+        g2.handleResult(guess, guessCharMatch2);
+        g3.handleResult(guess, guessCharMatch3);
+        g4.handleResult(guess, guessCharMatch4);
+    }
 }
 
 function makeSingle(g1: WordleGuesser) {
@@ -442,13 +496,22 @@ function logGameState(game1: WordleGuesser, game2?: WordleGuesser, guessInfo: gu
 
 playWordle();
 function playWordle() {
+    console.log('~~~~~~~~~~~~~~~ Starting Wordle ~~~~~~~~~~~~~~~');
     const oldGuessStyle = false;
+    const filterS = true;
     const a = new WordleGame();
-    const guesser = new WordleGuesser(a, false);
-    guesser.handleResult('raise', [0,0,1,0,1]);
-    guesser.handleResult('lined', [0,2,0,2,0]);
-    // guesser.handleResult('nobly', [0,0,1,1,2]);
-    const res0 = rateGuessByOutcome({potentialGuesses: words, possible: guesser.possible, recursive: false});
+    const guesser = new WordleGuesser(a, filterS, badNYTWords);
+    guesser.handleResult('raise', [0,0,0,0,0]);
+    guesser.handleResult('month', [1,0,0,0,0]);
+    // guesser.handleResult('voice', [0,0,0,0,1]);
+    // guesser.handleResult('spend', [0,0,1,0,0]);
+    // guesser.handleResult('razor', [0,2,0,0,2]);
+
+
+    // guesser.handleResult('xater', [0,2,2,2,2]);
+    // guesser.handleResult('eaxxr', [0,2,2,2,2]);
+    // guesser.handleResult('earxt', [2,2,2,0,2]);
+    const res0 = rateGuessByOutcome({potentialGuesses: words, possible: guesser.possible, recursive: false, logging: 'basic'});
     logGameState(guesser, undefined, res0);
     const letters = getLetterCounts(guesser.possible);
     if (guesser.possible.size > 2) {
@@ -469,8 +532,10 @@ function playWordle() {
             outComesStringed: word.outcomeStringed.slice(0, 40),
             recursive: word.recursiveOutcomes.map((out: any) => JSON.stringify(out)),
         })));
-        console.log('Other high schoring guesses');
-        console.log(JSON.stringify(res0.slice(5, 20).map(word => ([ word.guess, word.outcome.size, word.roughAvgGuess.toFixed(2) ]))));
+        console.log('Compressed list');
+        console.log(JSON.stringify(res0.slice(0, 20).map(word => ([ word.guess, word.outcome.size, word.roughAvgGuess.toFixed(2) ]))));
+        console.log('...');
+        console.log(JSON.stringify(res0.slice(20, 40).map(word => ([ word.guess, word.outcome.size, word.roughAvgGuess.toFixed(2) ]))));
 
     } else {
         console.log();
@@ -496,6 +561,7 @@ function playWordle() {
 }
 
 // playDordle();
+
 function playDordle() {
     const a1 = new WordleGame();
     const a2 = new WordleGame();
@@ -503,9 +569,9 @@ function playDordle() {
     const guesser1 = new WordleGuesser(a1);
     const guesser2 = new WordleGuesser(a2);
     const handle = makeDouble(guesser1, guesser2);
-    handle('raise', [1,0,2,0,0], [0,1,0,0,1]);
-    handle('plant', [0,1,0,0,0], [0,0,1,0,0]);
-    handle('ahead', [0,0,0,0,0], [2,2,2,2,2]);
+    handle('raise', [0,0,0,0,0], [0,2,1,0,0]);
+    handle('mulct', [0,0,0,0,1], [0,0,1,0,1]);
+    handle('latin', [0,0,1,0,1], [2,2,2,2,2]);
     logGameState(guesser1, guesser2);
     console.log();
     console.log('Rated by outcome:');
@@ -516,4 +582,41 @@ function playDordle() {
     console.log(res1.slice(0, 5));
 }
 
-console.log(naiveWordFilter(['r','a','s','l','n','d'],['','i', '', 'e']));
+// playQuordle();
+function playQuordle() {
+    console.log('~~~~~~~~~~~~~~~ Starting Quordle ~~~~~~~~~~~~~~~');
+    const a1 = new WordleGame();
+    const a2 = new WordleGame();
+    const a3 = new WordleGame();
+    const a4 = new WordleGame();
+
+    const guesser1 = new WordleGuesser(a1);
+    const guesser2 = new WordleGuesser(a2);
+    const guesser3 = new WordleGuesser(a3);
+    const guesser4 = new WordleGuesser(a4);
+    const handle = makeQuordle(guesser1, guesser2, guesser3, guesser4);
+    handle('raise', [0,0,2,0,1], [1,1,0,0,0], [0,2,0,0,0], [0,0,2,0,2]);
+    handle('count', [0,0,0,0,0], [0,0,0,2,0], [0,0,0,0,0], [0,1,0,0,0]);
+    handle('glyph', [0,2,0,1,0], [0,0,0,1,0], [2,0,1,0,0], [0,0,0,0,0]);
+    handle('oxide', [0,0,2,1,1], [0,0,0,0,0], [0,0,0,0,0], [2,2,2,2,2]);
+    handle('piled', [2,1,1,2,2], [2,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]);
+    handle('plied', [2,2,2,2,2], [2,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]);
+    handle('prank', [0,0,0,0,0], [2,2,2,2,2], [0,0,1,0,1], [0,0,0,0,0]);
+    // handle('', [0,0,0,0,0], [0,0,2,0,2], [0,0,0,0,1], [2,2,2,2,2]);
+
+
+    logGameState(guesser1, guesser2);
+    console.log();
+    console.log('Rated by outcome:');
+    // const res1 = rateDordleByOutcome({potentialGuesses: Array.from(guesser1.possible).concat(Array.from(guesser2.possible)), possible: guesser1.possible, possible2: guesser2.possible });
+    const res1 = rateQuordleByOutcome({potentialGuesses: words, possible: guesser1.possible, possible2: guesser2.possible, possible3: guesser3.possible, possible4: guesser4.possible });
+    res1.sort((a, b) => a.sumAvgGuess - b.sumAvgGuess);
+    console.log(res1.slice(0, 5));
+    console.log('Compressed list');
+    console.log(JSON.stringify(res1.slice(0, 10).map(word => ([
+            word.guess,
+            word.numOutcomesList,
+            word.sumAvgGuess.toFixed(2) ]))));
+}
+
+// console.log(naiveWordFilter(['r','a','s','l','n','d'],['','i', '', 'e']));
