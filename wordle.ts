@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
-const words: string[] = fs.readFileSync('./wordle/5words4.txt')
+const words: string[] = fs.readFileSync('./wordle/5words4-lsv-freq-full.txt')
     .toString().split('\n');
 const wordsSet = new Set(words);
 const badNYTWords = ['bonny', 'fondu', 'nonny', 'plumy'];
