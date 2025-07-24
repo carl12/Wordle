@@ -1,0 +1,25 @@
+{
+  "name": "Wordle",
+  "version": "1.0.0",
+  "description": "",
+  "main": "GenericRandoms.js",
+  "scripts": {
+    "word": "tsx wordle.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carl12/Wordle.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/carl12/Wordle/issues"
+  },
+  "homepage": "https://github.com/carl12/Wordle#readme",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}
