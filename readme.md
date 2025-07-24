@@ -12,6 +12,7 @@ npm run word
 
 ### Improvements
 
+- Move to seperate repo
 - Interface improvements
     - Terminal interface
     - Gui interface
