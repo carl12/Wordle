@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 // Filter out words which end in S. Wordl filters out plurals and past tense `ed` words
-const words: string[] = fs.readFileSync('./wordLists/5words4-lsv-freq-full.txt')
-    .toString().split('\n');
-const wordsSet = new Set(words);
+const badAntiWords = ['ohhhh', 'ahhhh', 'pffft']
 const badNYTWords = ['bonny', 'fondu', 'nonny', 'plumy', 'shish', 'ftped', 'mater', 'caret'];
+const words: string[] = fs.readFileSync('./wordLists/5words4-lsv-freq-full.txt')
+    .toString().split('\n').filter(w => !badAntiWords.includes(w));
+const wordsSet = new Set(words);
 const addedNYTWords = ['bliss'];
 class WordleGame {
     myWord: string;
@@ -540,9 +541,13 @@ function playWordle() {
     const filterS = true;
     const a = new WordleGame();
     const guesser = new WordleGuesser(a, filterS, badNYTWords);
-    guesser.handleResult('raise', [1,2,0,0,1]);
-    guesser.handleResult('typed', [1,0,0,2,0]);
-    // guesser.handleResult('pinup', [0,0,0,2,0]);
+    guesser.handleResult('money', [0,2,0,2,0]);
+    // guesser.handleResult('sober', [0,2,0,2,2]);
+    // guesser.handleResult('voter', [0,2,0,2,2]);
+    // guesser.handleResult('loper', [0,2,0,2,2]);
+    // guesser.handleResult('dozer', [0,2,0,2,2]);
+    // guesser.handleResult('gland', [0,0,2,0,0]);
+    // guesser.handleResult('track', [0,0,2,0,1]);
     // guesser.handleResult('hokum', [0,1,0,2,0]);
     // guesser.handleResult('about', [0,0,2,2,0]);
     const res0 = getWordleGuessOutcomes({potentialGuesses: words, possible: guesser.possible, recursive: false, logging: 'basic'});
@@ -609,13 +614,12 @@ function playAntiWordle() {
     const a = new WordleGame();
     const guesser = new WordleGuesser(a, filterS, badNYTWords);
     guesser.handleResult('esses', [0,0,0,0,0]);
-    guesser.handleResult('quipu', [0,1,0,0,0]);
-    guesser.handleResult('mummy', [0,1,0,0,0]);
-    guesser.handleResult('kudzu', [0,1,1,0,0]);
-    guesser.handleResult('outdo', [1,1,0,1,0]);
-    guesser.handleResult('dunno', [1,1,0,0,1]);
-    guesser.handleResult('dough', [1,1,1,0,0]);
-    console.log(guesser.correctChars);
+    guesser.handleResult('jazzy', [0,0,0,0,0]);
+    guesser.handleResult('villi', [0,0,0,0,0]);
+    guesser.handleResult('oxbow', [0,0,0,0,0]);
+    guesser.handleResult('gruff', [0,0,2,0,0]);
+    // guesser.handleResult('dunno', [1,1,0,0,1]);
+    // guesser.handleResult('dough', [1,1,1,0,0]);
     const guessable = words.filter((word) => !guesser.correctChars.some((c, i) => c && word.charAt(i) !== c)).filter((word) => !Array.from(guesser.invalidChars).some(c => word.includes(c))).filter(word => !(Array.from(guesser.misplacedChars)).some(c => !word.includes(c)));
     const res0 = getWordleGuessOutcomes({potentialGuesses: guessable, possible: guesser.possible, recursive: false, logging: 'basic'});
     res0.sort((a, b) => a.numOutcomes - b.numOutcomes);
