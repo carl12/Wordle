@@ -537,6 +537,19 @@ function makeSingle(g1: WordleGuesser) {
     }
 }
 
+function sortOutcome(outcomes: guessOutcome[], sorts: [keyof guessOutcome, boolean][]): guessOutcome[] {
+    return outcomes.sort((a, b) => {
+        for (const sort of sorts) {
+            const [key, asc] = sort;
+            if (a[key] === b[key]) {
+                continue;
+            }
+            return asc ? a[key] - b[key] : b[key] - a[key]
+        }
+        return 0;
+    });
+}
+
 function logGameState(game1: WordleGuesser, game2?: WordleGuesser, guessInfo: guessOutcome[] = []): void {
     let fileName;
     let output;
@@ -589,11 +602,12 @@ function playWordle() {
     const filterS = true;
     const a = new WordleGame();
     const guesser = new WordleGuesser(a, filterS, badNYTWords);
-    guesser.handleResult('toile', [1,1,0,0,0]);
-    guesser.handleResult('arson', [0,1,1,1,0]);
+    guesser.handleResult('toile', [0,1,0,0,0]);
+    // guesser.handleResult('caron', [0,1,1,1,2]);
     // guesser.handleResult('voter', [0,2,0,2,2]);
     const res0 = getWordleGuessOutcomes({potentialGuesses: words, possible: guesser.possible, recursive: false, logging: 'basic'});
-    res0.sort((a, b) => b.numOutcomes - a.numOutcomes);
+    sortOutcome(res0, [['numOutcomes', false], ['roughAvgGuess', true]])
+    // res0.sort((a, b) => a.roughAvgGuess - b.roughAvgGuess);
     const guesses = res0.map(a => a.guess);
     // const letterCount = getLetterCounts(guesses.slice(0, 100));
     // const guessRarity = doLetterCountRanking(guesses.slice(0, 100), letterCount, false);
